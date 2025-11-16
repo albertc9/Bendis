@@ -9,7 +9,7 @@ repository = "https://github.com/albertc9/Bendis"
 homepage = "https://github.com/albertc9/Bendis"
 documentation = "https://github.com/albertc9/Bendis"
 readme = "README.md"
-keywords = ["hardware", "bender", "dependency-management", "eda", "verilog"]
+keywords = ["hardware", "bender", "dependencies", "eda", "verilog"]
 categories = ["command-line-utilities", "development-tools"]
 rust-version = "1.70"
 
