@@ -25,16 +25,13 @@ This creates a `.bendis/` directory with blank `Bender.yml` and `.bender.yml` fi
 
 ### Update dependencies
 
+When using Bendis, only edit Bender configuration files in the `.bendis/` directory. Don't edit the files in the project root, it will be overwritten.
+
+To update dependencies, run:
+
 ```bash
 bendis update
 ```
-
-This command:
-1. Runs `bender update` in `.bendis/` directory
-2. Converts GitHub URLs to IHEP internal URLs
-3. Generates `Bender.yml` and `.bender.yml` in project root
-4. Runs `bender update` in project root
-5. Cleans up temporary files
 
 ### Other commands
 
