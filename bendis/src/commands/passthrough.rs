@@ -1,13 +1,9 @@
 use anyhow::{Context, Result};
-use colored::Colorize;
 use std::process::Command;
 
 pub fn run(args: &[String]) -> Result<()> {
-    println!(
-        "{} {}",
-        "Passing through to bender:".dimmed(),
-        args.join(" ").cyan()
-    );
+    // Don't print anything to stdout, as it will interfere with bender's output
+    // (e.g., when generating scripts with `bender script`)
 
     let status = Command::new("bender")
         .args(args)

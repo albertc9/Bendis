@@ -1,6 +1,6 @@
 [package]
 name = "bendis"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 authors = ["Heris Team"]
 description = "A patch tool for Bender to work better in HERIS project"
