@@ -1,43 +1,70 @@
+
 # Bendis
 
-A patch tool for Bender to work better in Heris project.
+[![Crates.io](https://img.shields.io/crates/v/bendis.svg)](https://crates.io/crates/bendis)
+[![Crates.io Downloads](https://img.shields.io/crates/d/bendis)](https://crates.io/crates/bendis)
+[![GitHub](https://img.shields.io/badge/GitHub-Bendis-black?logo=github)](https://github.com/albertc9/Bendis)
+[![GitLab](https://img.shields.io/badge/GitLab-IHEP%20Repo-orange?logo=gitlab)](https://code.ihep.ac.cn/heris/bendis)
 
-## Author
-> Albert L. Cheung, UC Irvine
 
-> albert.cheung@cern.ch
+A patch tool for Bender to work better in the HERIS project.
 
-## Features
+> Author: Albert L. Cheung, IHEP 
+> Email: albert.cheung@cern.ch
+---
 
-- **URL Conversion**: Automatically converts GitHub URLs to IHEP internal Git URLs
-- **Seamless Integration**: Works as a drop-in replacement for Bender
-- **Fast**: Written in Rust for optimal performance
+### Links
 
-## Usage
+- **Crates.io:** https://crates.io/crates/bendis  
+- **GitHub:** https://github.com/albertc9/Bendis  
+- **GitLab (IHEP internal):** https://code.ihep.ac.cn/heris/bendis  
 
-### Initialize a project
+---
+
+### Features
+
+- **URL Conversion**: Automatically converts GitHub URLs to IHEP internal Git URLs  
+- **Seamless Integration**: Works as a drop-in replacement for Bender  
+- **Fast**: Written in Rust for optimal performance  
+
+---
+
+### Installation
+
+```bash
+cargo install bendis
+```
+
+---
+
+### Usage
+
+#### Initialize a project
 
 ```bash
 bendis init
 ```
 
-This creates a `.bendis/` directory with blank `Bender.yml` and `.bender.yml` files.
+Creates a `.bendis/` directory with blank `Bender.yml` and `.bender.yml`.
 
-### Update dependencies
+#### Update dependencies
 
-When using Bendis, only edit Bender configuration files in the `.bendis/` directory. Don't edit the files in the project root, it will be overwritten.
+When using Bendis, **only edit the configuration files inside `.bendis/`**.
+The copies in the project root will be overwritten.
 
-To update dependencies, run:
+Update dependencies with:
 
 ```bash
 bendis update
 ```
 
-### Other commands
+#### Other commands
 
-All other commands are passed through to Bender:
+All other commands are passed through to Bender transparently.
 
-## File Structure
+---
+
+### File Structure
 
 ```
 project/
