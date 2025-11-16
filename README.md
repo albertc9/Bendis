@@ -53,7 +53,3 @@ project/
 ├── Bender.lock             # Final lock file
 └── .bender/                # Dependencies directory
 ```
-
-## License
-
-Same as Bender (Apache-2.0 or MIT)
