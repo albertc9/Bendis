@@ -1,0 +1,19 @@
+# Rust build artifacts
+target/
+
+# Note: Cargo.lock should be committed for binary crates
+# It is NOT in .gitignore to ensure reproducible builds
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+*.log

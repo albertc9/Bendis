@@ -1,5 +1,15 @@
-
-bender/
+# Old test directories (can be removed if not needed)
 input/
 output/
 log/
+
+# Bender source (usually from git submodule)
+bender/
+
+# Bendis build artifacts
+bendis/target/
+
+# Note: bendis/Cargo.lock should be committed for reproducible builds
+
+# Test directories
+test_*/
