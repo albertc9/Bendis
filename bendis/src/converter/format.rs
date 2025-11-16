@@ -1,16 +1,30 @@
 use anyhow::{Context, Result};
-use colored::Colorize;
-use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-#[serde(untagged)]
+#[derive(Debug, Serialize, Clone)]
 enum Source {
     Git(String),
     Path(String),
+}
+
+impl<'de> Deserialize<'de> for Source {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let map = HashMap::<String, String>::deserialize(deserializer)?;
+
+        if let Some(git_url) = map.get("Git") {
+            Ok(Source::Git(git_url.clone()))
+        } else if let Some(path) = map.get("Path") {
+            Ok(Source::Path(path.clone()))
+        } else {
+            Err(serde::de::Error::custom("Expected 'Git' or 'Path' key in source"))
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -195,22 +209,21 @@ fn format_dependency_line(
         let url_padding = " ".repeat(max_url_len.saturating_sub(url_part.len()));
         format!("  {}:{} {}{}}}", name, name_padding, url_part, url_padding)
     } else if let Some(serde_yaml::Value::String(git_url)) = dep_info.get("git") {
-        let git_part = format!(r#"{{ git: "{}"#, git_url);
-
         if let Some(version) = dep_info.get("version") {
             let version_str = match version {
                 serde_yaml::Value::String(s) => s.clone(),
                 serde_yaml::Value::Number(n) => n.to_string(),
                 _ => format!("{:?}", version),
             };
-            let git_part_with_comma = format!("{},", git_part);
-            let url_padding = " ".repeat(max_url_len.saturating_sub(git_part_with_comma.len()));
-            format!("  {}:{} {}{} version: {} }}", name, name_padding, git_part_with_comma, url_padding, version_str)
+            let git_part = format!(r#"{{ git: "{}","#, git_url);
+            let url_padding = " ".repeat(max_url_len.saturating_sub(git_part.len()));
+            format!("  {}:{} {}{} version: {} }}", name, name_padding, git_part, url_padding, version_str)
         } else if let Some(serde_yaml::Value::String(rev)) = dep_info.get("rev") {
-            let git_part_with_comma = format!("{},", git_part);
-            let url_padding = " ".repeat(max_url_len.saturating_sub(git_part_with_comma.len()));
-            format!(r#"  {}:{} {}{} rev: "{}" }}"#, name, name_padding, git_part_with_comma, url_padding, rev)
+            let git_part = format!(r#"{{ git: "{}","#, git_url);
+            let url_padding = " ".repeat(max_url_len.saturating_sub(git_part.len()));
+            format!(r#"  {}:{} {}{} rev: "{}" }}"#, name, name_padding, git_part, url_padding, rev)
         } else {
+            let git_part = format!(r#"{{ git: "{}"#, git_url);
             let url_padding = " ".repeat(max_url_len.saturating_sub(git_part.len()));
             format!("  {}:{} {}{} }}", name, name_padding, git_part, url_padding)
         }
@@ -273,11 +286,39 @@ fn update_bender_yml_overrides(
     // Build new overrides section
     let new_overrides_section = format!("overrides:\n{}", override_lines.join("\n"));
 
-    // Replace overrides section
-    let pattern = Regex::new(r"overrides:.*?(?=\n[a-z_]+:|$)").unwrap();
-    let updated_text = pattern.replace(bender_yml_text, new_overrides_section.as_str());
+    // Replace overrides section - find "overrides:" and everything until the next top-level key or end
+    // Split into lines and rebuild, replacing the overrides section
+    let lines: Vec<&str> = bender_yml_text.lines().collect();
+    let mut result = Vec::new();
+    let mut in_overrides = false;
+    let mut overrides_found = false;
 
-    updated_text.to_string()
+    for line in lines {
+        if line.starts_with("overrides:") {
+            // Found the overrides section, replace it
+            result.push(new_overrides_section.as_str());
+            in_overrides = true;
+            overrides_found = true;
+        } else if in_overrides {
+            // Check if this is a new top-level section (starts with a letter and ends with :)
+            if !line.is_empty() && !line.starts_with(' ') && !line.starts_with('\t') {
+                // New section, stop skipping
+                in_overrides = false;
+                result.push(line);
+            }
+            // Otherwise skip this line (it's part of the old overrides)
+        } else {
+            result.push(line);
+        }
+    }
+
+    // If we didn't find an overrides section, append it at the end
+    if !overrides_found {
+        result.push("\n");
+        result.push(new_overrides_section.as_str());
+    }
+
+    result.join("\n")
 }
 
 /// Main conversion function
@@ -285,84 +326,45 @@ pub fn convert(
     bendis_dir: &Path,
     root_dir: &Path,
 ) -> Result<()> {
-    println!("{}", "Running format converter...".bold().cyan());
-
     // Read input files
     let lock_path = bendis_dir.join("Bender.lock");
     let yml_path = bendis_dir.join("Bender.yml");
     let bender_yml_path = bendis_dir.join(".bender.yml");
 
-    println!("  {} Reading {}", "→".blue(), lock_path.display());
     let lock_content = fs::read_to_string(&lock_path)
         .context("Failed to read .bendis/Bender.lock")?;
     let lock_data: LockFile = serde_yaml::from_str(&lock_content)
         .context("Failed to parse Bender.lock")?;
 
-    println!("  {} Reading {}", "→".blue(), yml_path.display());
     let yml_content = fs::read_to_string(&yml_path)
         .context("Failed to read .bendis/Bender.yml")?;
     let yml_data: BenderYml = serde_yaml::from_str(&yml_content)
         .unwrap_or(BenderYml { dependencies: None });
 
-    println!("  {} Reading {}", "→".blue(), bender_yml_path.display());
     let bender_yml_text = fs::read_to_string(&bender_yml_path)
         .context("Failed to read .bendis/.bender.yml")?;
     let bender_yml_data: DotBenderYml = serde_yaml::from_str(&bender_yml_text)
         .unwrap_or(DotBenderYml { overrides: None });
 
     // Extract dependencies
-    println!("  {} Extracting dependencies from lock file", "→".blue());
     let lock_deps = extract_dependencies_from_lock(&lock_data);
-
-    println!("  {} Extracting dependencies from Bender.yml", "→".blue());
     let yml_deps = extract_dependencies_from_yml(&yml_data);
-
-    println!("  {} Extracting existing overrides", "→".blue());
     let existing_overrides = extract_overrides_from_bender_yml(&bender_yml_data);
 
     // Find missing dependencies
-    println!("  {} Finding missing/updated dependencies", "→".blue());
     let missing_deps = find_missing_dependencies(&lock_deps, &yml_deps, &existing_overrides);
 
-    if !missing_deps.is_empty() {
-        println!("  {} Found {} dependencies to add/update:", "✓".green(), missing_deps.len());
-        for dep_name in missing_deps.keys() {
-            println!("      - {}", dep_name.yellow());
-        }
-    } else {
-        println!("  {} No new dependencies to add", "ℹ".blue());
-    }
-
     // Copy Bender.yml to root
-    println!("  {} Copying Bender.yml to root", "→".blue());
     fs::copy(&yml_path, root_dir.join("Bender.yml"))
         .context("Failed to copy Bender.yml to root")?;
 
     // Update .bender.yml
-    println!("  {} Generating new .bender.yml", "→".blue());
     let updated_bender_yml = update_bender_yml_overrides(&bender_yml_text, &existing_overrides, &missing_deps);
 
     // Write to root
     let output_path = root_dir.join(".bender.yml");
     fs::write(&output_path, updated_bender_yml)
         .context("Failed to write .bender.yml to root")?;
-
-    println!("  {} Wrote {}", "✓".green(), output_path.display());
-    println!(
-        "\n  {} Total dependencies in lock: {}",
-        "📊".to_string(),
-        lock_deps.len()
-    );
-    println!(
-        "  {} Dependencies in Bender.yml: {}",
-        "📊".to_string(),
-        yml_deps.len()
-    );
-    println!(
-        "  {} Added/updated in overrides: {}",
-        "📊".to_string(),
-        missing_deps.len()
-    );
 
     Ok(())
 }

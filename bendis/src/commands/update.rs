@@ -1,16 +1,17 @@
 use anyhow::{bail, Context, Result};
-use colored::Colorize;
+use sha2::{Sha256, Digest};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use crate::converter::format;
-use crate::utils::config;
+use crate::utils::config::{self, BendisConfig};
 
 pub fn run() -> Result<()> {
-    println!("{}", "=".repeat(60).bright_blue());
-    println!("{}", "Starting Bendis Update Process".bold().green());
-    println!("{}", "=".repeat(60).bright_blue());
+    println!("Updating dependencies...");
+
+    // Load configuration
+    let cfg = BendisConfig::load()?;
 
     let bendis_dir = config::get_bendis_dir();
     let root_dir = config::get_root_dir();
@@ -18,194 +19,171 @@ pub fn run() -> Result<()> {
     // Check if .bendis directory exists
     if !bendis_dir.exists() {
         bail!(
-            "{}\n{}",
-            "Error: .bendis directory not found!".red().bold(),
-            format!(
-                "Please run {} first to initialize the project.",
-                "bendis init".cyan().bold()
-            )
+            "error: .bendis directory not found\nrun `bendis init` first to initialize the project"
         );
     }
 
     // Step 1: Run bender update in .bendis directory
-    println!(
-        "\n{} {}",
-        "Step 1/5:".bold().yellow(),
-        "Running bender update in .bendis/".bold()
-    );
-    println!("{}", "-".repeat(60).dimmed());
-
-    run_bender_update_in_bendis(&bendis_dir)?;
+    println!("  Preparing cache files...");
+    run_bender_update_in_bendis(&bendis_dir, cfg.silent_mode == 1)?;
 
     // Step 2: Run format converter
-    println!(
-        "\n{} {}",
-        "Step 2/5:".bold().yellow(),
-        "Converting URLs and generating files".bold()
-    );
-    println!("{}", "-".repeat(60).dimmed());
-
+    println!("  Converting URLs...");
     format::convert(&bendis_dir, &root_dir)?;
 
-    // Step 3: Run bender update in root directory
-    println!(
-        "\n{} {}",
-        "Step 3/5:".bold().yellow(),
-        "Running bender update in root directory".bold()
-    );
-    println!("{}", "-".repeat(60).dimmed());
+    // Step 3: Check if files changed, run bender update if needed
+    println!("  Checking for changes...");
+    let needs_update = check_files_changed(&root_dir)?;
 
-    run_bender_update_in_root()?;
+    if needs_update {
+        println!("  Detected changes, updating dependencies...");
+        cleanup_root_files(&root_dir)?;
+        run_bender_update_in_root()?;
+    } else {
+        println!("  No changes detected, skipping bender update");
+    }
 
-    // Step 4: Remove .bendis/.bender directory
-    println!(
-        "\n{} {}",
-        "Step 4/5:".bold().yellow(),
-        "Cleaning up .bendis/.bender/".bold()
-    );
-    println!("{}", "-".repeat(60).dimmed());
+    // Step 4: Clean up based on storage_saving_mode
+    println!("  Cleaning up cache...");
+    cleanup_bendis_bender_dir(&bendis_dir, cfg.storage_saving_mode == 1)?;
 
-    cleanup_bendis_bender_dir(&bendis_dir)?;
-
-    // Step 5: Done
-    println!(
-        "\n{} {}",
-        "Step 5/5:".bold().yellow(),
-        "Verification".bold()
-    );
-    println!("{}", "-".repeat(60).dimmed());
-
+    // Step 5: Verify
     verify_completion(&root_dir)?;
 
-    println!("\n{}", "=".repeat(60).bright_blue());
-    println!("{}", "Bendis Update Completed Successfully!".bold().green());
-    println!("{}", "=".repeat(60).bright_blue());
-    println!(
-        "\n{} Your project is now updated with IHEP internal URLs.",
-        "✓".green()
-    );
-    println!(
-        "{} Lock file: {}",
-        "✓".green(),
-        "Bender.lock".cyan()
-    );
-    println!(
-        "{} Dependencies: {}",
-        "✓".green(),
-        ".bender/".cyan()
-    );
+    println!("Done");
 
     Ok(())
 }
 
-fn run_bender_update_in_bendis(bendis_dir: &Path) -> Result<()> {
-    println!("  {} Executing: bender -d ./.bendis update", "→".blue());
+fn calculate_file_hash(path: &Path) -> Result<String> {
+    let content = fs::read(path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let hash = Sha256::digest(&content);
+    Ok(format!("{:x}", hash))
+}
 
-    let status = Command::new("bender")
-        .args(&["-d", "./.bendis", "update"])
-        .status()
+fn check_files_changed(root_dir: &Path) -> Result<bool> {
+    let bender_yml = root_dir.join("Bender.yml");
+    let dot_bender_yml = root_dir.join(".bender.yml");
+
+    // If files don't exist, we need to update
+    if !bender_yml.exists() || !dot_bender_yml.exists() {
+        return Ok(true);
+    }
+
+    // Calculate current hashes
+    let current_bender_yml_hash = calculate_file_hash(&bender_yml)?;
+    let current_dot_bender_yml_hash = calculate_file_hash(&dot_bender_yml)?;
+
+    // Calculate new hashes from .bendis
+    let bendis_dir = config::get_bendis_dir();
+    let new_bender_yml = bendis_dir.join("Bender.yml");
+    let new_dot_bender_yml = root_dir.join(".bender.yml"); // This was just written by format::convert
+
+    if !new_bender_yml.exists() {
+        return Ok(true);
+    }
+
+    let new_bender_yml_hash = calculate_file_hash(&new_bender_yml)?;
+    let new_dot_bender_yml_hash = calculate_file_hash(&new_dot_bender_yml)?;
+
+    // Compare hashes
+    Ok(current_bender_yml_hash != new_bender_yml_hash ||
+       current_dot_bender_yml_hash != new_dot_bender_yml_hash)
+}
+
+fn run_bender_update_in_bendis(bendis_dir: &Path, silent: bool) -> Result<()> {
+    let mut cmd = Command::new("bender");
+    cmd.args(&["-d", "./.bendis", "update"]);
+
+    // If silent mode is enabled, suppress all output
+    if silent {
+        cmd.stdout(Stdio::null());
+        cmd.stderr(Stdio::null());
+    }
+
+    let status = cmd.status()
         .context("Failed to run bender. Is bender installed and in PATH?")?;
 
     if !status.success() {
-        bail!(
-            "{}",
-            "Bender update in .bendis/ failed!".red().bold()
-        );
+        bail!("error: bender update in .bendis/ failed");
     }
 
     // Check if Bender.lock was created
     let lock_file = bendis_dir.join("Bender.lock");
     if !lock_file.exists() {
-        bail!(
-            "{}",
-            "Failed to generate .bendis/Bender.lock".red().bold()
-        );
+        bail!("error: failed to generate .bendis/Bender.lock");
     }
 
-    println!("  {} Bender update in .bendis/ completed", "✓".green());
-    println!("  {} Generated .bendis/Bender.lock", "✓".green());
+    Ok(())
+}
+
+fn cleanup_root_files(root_dir: &Path) -> Result<()> {
+    // Remove old Bender.lock if exists
+    let old_lock = root_dir.join("Bender.lock");
+    if old_lock.exists() {
+        fs::remove_file(&old_lock)
+            .context("Failed to remove old Bender.lock")?;
+    }
+
+    // Remove old .bender/ directory if exists
+    let old_bender_dir = root_dir.join(".bender");
+    if old_bender_dir.exists() {
+        fs::remove_dir_all(&old_bender_dir)
+            .context("Failed to remove old .bender/ directory")?;
+    }
 
     Ok(())
 }
 
 fn run_bender_update_in_root() -> Result<()> {
-    println!("  {} Executing: bender update", "→".blue());
-
     let status = Command::new("bender")
         .arg("update")
         .status()
         .context("Failed to run bender in root directory")?;
 
     if !status.success() {
-        bail!(
-            "{}",
-            "Bender update in root directory failed!".red().bold()
-        );
+        bail!("error: bender update in root directory failed");
     }
-
-    println!("  {} Bender update in root directory completed", "✓".green());
-    println!("  {} Generated Bender.lock", "✓".green());
-    println!("  {} Generated .bender/ with dependencies", "✓".green());
 
     Ok(())
 }
 
-fn cleanup_bendis_bender_dir(bendis_dir: &Path) -> Result<()> {
-    let bender_dir = bendis_dir.join(".bender");
-
-    if bender_dir.exists() {
-        println!("  {} Removing .bendis/.bender/", "→".blue());
-        fs::remove_dir_all(&bender_dir)
-            .context("Failed to remove .bendis/.bender/")?;
-        println!("  {} Removed .bendis/.bender/", "✓".green());
+fn cleanup_bendis_bender_dir(bendis_dir: &Path, full_cleanup: bool) -> Result<()> {
+    if full_cleanup {
+        // storage_saving_mode = 1: delete entire .bendis/.bender/
+        let bender_dir = bendis_dir.join(".bender");
+        if bender_dir.exists() {
+            fs::remove_dir_all(&bender_dir)
+                .context("Failed to remove .bendis/.bender/")?;
+        }
     } else {
-        println!("  {} .bendis/.bender/ not found (already clean)", "ℹ".blue());
+        // storage_saving_mode = 0: don't delete anything (keep cache)
+        // Do nothing
     }
 
     Ok(())
 }
 
 fn verify_completion(root_dir: &Path) -> Result<()> {
-    let mut success = true;
+    let mut missing = Vec::new();
 
-    // Check Bender.yml
-    let bender_yml = root_dir.join("Bender.yml");
-    if bender_yml.exists() {
-        println!("  {} Bender.yml exists", "✓".green());
-    } else {
-        println!("  {} Bender.yml missing!", "✗".red());
-        success = false;
+    // Check required files
+    if !root_dir.join("Bender.yml").exists() {
+        missing.push("Bender.yml");
+    }
+    if !root_dir.join(".bender.yml").exists() {
+        missing.push(".bender.yml");
+    }
+    if !root_dir.join("Bender.lock").exists() {
+        missing.push("Bender.lock");
+    }
+    if !root_dir.join(".bender").exists() {
+        missing.push(".bender/");
     }
 
-    // Check .bender.yml
-    let dot_bender_yml = root_dir.join(".bender.yml");
-    if dot_bender_yml.exists() {
-        println!("  {} .bender.yml exists", "✓".green());
-    } else {
-        println!("  {} .bender.yml missing!", "✗".red());
-        success = false;
-    }
-
-    // Check Bender.lock
-    let lock_file = root_dir.join("Bender.lock");
-    if lock_file.exists() {
-        println!("  {} Bender.lock exists", "✓".green());
-    } else {
-        println!("  {} Bender.lock missing!", "✗".red());
-        success = false;
-    }
-
-    // Check .bender directory
-    let bender_dir = root_dir.join(".bender");
-    if bender_dir.exists() {
-        println!("  {} .bender/ directory exists", "✓".green());
-    } else {
-        println!("  {} .bender/ directory missing!", "✗".red());
-        success = false;
-    }
-
-    if !success {
-        bail!("Verification failed! Some files are missing.");
+    if !missing.is_empty() {
+        bail!("error: verification failed, missing: {}", missing.join(", "));
     }
 
     Ok(())

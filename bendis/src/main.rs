@@ -27,6 +27,8 @@ enum Commands {
     Init,
     /// Update dependencies with URL conversion
     Update,
+    /// Edit bendis configuration file
+    Config,
 }
 
 fn main() -> Result<()> {
@@ -39,17 +41,21 @@ fn main() -> Result<()> {
         Some(Commands::Update) => {
             commands::update::run()?;
         }
+        Some(Commands::Config) => {
+            commands::config::run()?;
+        }
         None => {
             // Pass through to bender
             if !cli.args.is_empty() {
                 commands::passthrough::run(&cli.args)?;
             } else {
                 // No command, show help
-                println!("{}", "Bendis - Bender wrapper for Heris project".bold().green());
+                println!("{}", "Bendis - Bender Pro for Heris project".bold().green());
                 println!("\nUsage: bendis <COMMAND>");
                 println!("\nCommands:");
                 println!("  init     Initialize bendis project structure");
                 println!("  update   Update dependencies with URL conversion");
+                println!("  config   Edit bendis configuration file");
                 println!("  <other>  Pass through to bender");
                 println!("\nOptions:");
                 println!("  -h, --help     Print help");
