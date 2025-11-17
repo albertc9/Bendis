@@ -14,8 +14,19 @@ const ASCII_ART: &str = r#"
 
 /// Display the welcome message for first-time users
 pub fn show_welcome() {
+    show_welcome_with_version(None);
+}
+
+/// Display the welcome message with optional previous version info
+pub fn show_welcome_with_version(previous_version: Option<&str>) {
     println!("{}", ASCII_ART.cyan());
-    println!("{}", format!("Welcome to Bendis v{}", VERSION).bold().green());
+
+    if let Some(prev_ver) = previous_version {
+        println!("{}", format!("Welcome to Bendis v{} (updated from v{})", VERSION, prev_ver).bold().green());
+    } else {
+        println!("{}", format!("Welcome to Bendis v{}", VERSION).bold().green());
+    }
+
     println!();
     println!("A patch tool for Bender to work better in HERIS project");
     println!();

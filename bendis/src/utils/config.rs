@@ -26,6 +26,10 @@ pub struct BendisConfig {
     /// 0 = already shown welcome (default), 1 = need to show welcome
     #[serde(default = "default_first_run")]
     pub first_run: u8,
+
+    /// Last run version: track the version to detect updates
+    #[serde(default = "default_version")]
+    pub version: String,
 }
 
 fn default_silent_mode() -> u8 {
@@ -44,6 +48,10 @@ fn default_first_run() -> u8 {
     1
 }
 
+fn default_version() -> String {
+    String::new()
+}
+
 impl Default for BendisConfig {
     fn default() -> Self {
         Self {
@@ -51,6 +59,7 @@ impl Default for BendisConfig {
             storage_saving_mode: default_storage_saving_mode(),
             gitignore_check: default_gitignore_check(),
             first_run: default_first_run(),
+            version: default_version(),
         }
     }
 }
@@ -107,12 +116,16 @@ gitignore_check = {}
 # First run flag: whether this is the first time running bendis
 # 0 = already shown welcome, 1 = need to show welcome (default)
 first_run = {}
+
+# Last run version: used to detect version updates
+version = \"{}\"
 ",
             config_path.display(),
             self.silent_mode,
             self.storage_saving_mode,
             self.gitignore_check,
-            self.first_run
+            self.first_run,
+            self.version
         );
 
         fs::write(&config_path, content_with_comments)
