@@ -118,10 +118,10 @@ fn run_bender_update_in_bendis(bendis_dir: &Path, silent: bool) -> Result<()> {
     let mut cmd = Command::new("bender");
     cmd.args(&["-d", "./.bendis", "update"]);
 
-    // If silent mode is enabled, suppress stdout but keep stderr for warnings/errors
+    // If silent mode is enabled, suppress both stdout and stderr
     if silent {
         cmd.stdout(Stdio::null());  // Hide normal output
-        // Keep stderr (don't redirect) so warnings and errors are still shown
+        cmd.stderr(Stdio::null());  // Hide progress messages and warnings
     }
 
     let status = cmd.status()
