@@ -5,6 +5,8 @@ mod utils;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use utils::config::BendisConfig;
+use utils::welcome;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -32,6 +34,27 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
+    // Check if this is the first run BEFORE parsing cli (clap will handle --version and exit)
+    let mut config = BendisConfig::load()?;
+    let is_first_run = config.first_run == 1;
+    let is_version_command = std::env::args().any(|arg| arg == "--version" || arg == "-V");
+
+    // Handle first run with --version specially
+    if is_first_run && is_version_command {
+        welcome::show_welcome();
+        config.first_run = 0;
+        config.save()?;
+        return Ok(());
+    }
+
+    // Show welcome message for first run (non-version commands)
+    if is_first_run {
+        welcome::show_welcome();
+        config.first_run = 0;
+        config.save()?;
+        welcome::show_separator();
+    }
+
     let cli = Cli::parse();
 
     match cli.command {

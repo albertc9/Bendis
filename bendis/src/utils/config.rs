@@ -21,6 +21,11 @@ pub struct BendisConfig {
     /// 1 = on (default), 0 = off
     #[serde(default = "default_gitignore_check")]
     pub gitignore_check: u8,
+
+    /// First run flag: whether this is the first time running bendis
+    /// 0 = already shown welcome (default), 1 = need to show welcome
+    #[serde(default = "default_first_run")]
+    pub first_run: u8,
 }
 
 fn default_silent_mode() -> u8 {
@@ -35,12 +40,17 @@ fn default_gitignore_check() -> u8 {
     1
 }
 
+fn default_first_run() -> u8 {
+    1
+}
+
 impl Default for BendisConfig {
     fn default() -> Self {
         Self {
             silent_mode: default_silent_mode(),
             storage_saving_mode: default_storage_saving_mode(),
             gitignore_check: default_gitignore_check(),
+            first_run: default_first_run(),
         }
     }
 }
@@ -93,11 +103,16 @@ storage_saving_mode = {}
 # GitIgnore check: auto-manage .bendis/.gitignore file
 # 1 = on (default), 0 = off
 gitignore_check = {}
+
+# First run flag: whether this is the first time running bendis
+# 0 = already shown welcome, 1 = need to show welcome (default)
+first_run = {}
 ",
             config_path.display(),
             self.silent_mode,
             self.storage_saving_mode,
-            self.gitignore_check
+            self.gitignore_check,
+            self.first_run
         );
 
         fs::write(&config_path, content_with_comments)
