@@ -3,6 +3,8 @@ use colored::Colorize;
 use std::fs;
 use std::path::Path;
 
+use crate::utils::config;
+
 pub fn run() -> Result<()> {
     println!("{}", "Initializing Bendis project...".bold().green());
 
@@ -63,6 +65,10 @@ pub fn run() -> Result<()> {
             .context("Failed to create .bendis/.bender.yml")?;
         println!("  {} Created blank .bendis/.bender.yml", "✓".green());
     }
+
+    // Create .gitignore in .bendis directory
+    config::create_bendis_gitignore()?;
+    println!("  {} Created .bendis/.gitignore", "✓".green());
 
     println!("\n{}", "Bendis initialized successfully!".bold().green());
     println!(

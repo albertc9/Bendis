@@ -16,6 +16,11 @@ pub struct BendisConfig {
     /// 0 = off (default, keep cache), 1 = on (delete entire .bendis/.bender/)
     #[serde(default = "default_storage_saving_mode")]
     pub storage_saving_mode: u8,
+
+    /// GitIgnore check: auto-manage .bendis/.gitignore file
+    /// 1 = on (default), 0 = off
+    #[serde(default = "default_gitignore_check")]
+    pub gitignore_check: u8,
 }
 
 fn default_silent_mode() -> u8 {
@@ -26,11 +31,16 @@ fn default_storage_saving_mode() -> u8 {
     0
 }
 
+fn default_gitignore_check() -> u8 {
+    1
+}
+
 impl Default for BendisConfig {
     fn default() -> Self {
         Self {
             silent_mode: default_silent_mode(),
             storage_saving_mode: default_storage_saving_mode(),
+            gitignore_check: default_gitignore_check(),
         }
     }
 }
@@ -79,10 +89,15 @@ silent_mode = {}
 # Storage saving mode: clean up .bendis/.bender/ after update
 # 0 = off (default, keep cache), 1 = on (delete entire .bendis/.bender/)
 storage_saving_mode = {}
+
+# GitIgnore check: auto-manage .bendis/.gitignore file
+# 1 = on (default), 0 = off
+gitignore_check = {}
 ",
             config_path.display(),
             self.silent_mode,
-            self.storage_saving_mode
+            self.storage_saving_mode,
+            self.gitignore_check
         );
 
         fs::write(&config_path, content_with_comments)
@@ -108,4 +123,66 @@ pub fn get_bendis_dir() -> PathBuf {
 /// Get the project root directory path
 pub fn get_root_dir() -> PathBuf {
     PathBuf::from(".")
+}
+
+/// Required entries for .bendis/.gitignore
+const REQUIRED_GITIGNORE_ENTRIES: &[&str] = &[
+    ".bender/",
+    "hw/",
+    "sw/",
+    "target/",
+    "utils/",
+];
+
+/// Default .gitignore content with header comment
+const DEFAULT_GITIGNORE_CONTENT: &str = "# Auto-managed by bendis
+# WARNING: Do not remove the entries below, they are required for proper git tracking
+# You can add your own entries after this section
+
+.bender/
+hw/
+sw/
+target/
+utils/
+";
+
+/// Check if .bendis/.gitignore contains all required entries
+/// Returns Ok(()) if all required entries exist, or Err with missing entries
+pub fn check_bendis_gitignore() -> Result<()> {
+    let gitignore_path = get_bendis_dir().join(".gitignore");
+
+    // If .gitignore doesn't exist, create it with default content
+    if !gitignore_path.exists() {
+        fs::write(&gitignore_path, DEFAULT_GITIGNORE_CONTENT)
+            .context("Failed to create .bendis/.gitignore")?;
+        return Ok(());
+    }
+
+    // Read existing content
+    let existing_content = fs::read_to_string(&gitignore_path)
+        .context("Failed to read .bendis/.gitignore")?;
+
+    // Check if all required entries are present
+    let missing_entries: Vec<&str> = REQUIRED_GITIGNORE_ENTRIES
+        .iter()
+        .filter(|&&entry| !existing_content.lines().any(|line| line.trim() == entry))
+        .copied()
+        .collect();
+
+    if !missing_entries.is_empty() {
+        anyhow::bail!(
+            "Missing required entries in .bendis/.gitignore: {}",
+            missing_entries.join(", ")
+        );
+    }
+
+    Ok(())
+}
+
+/// Create .bendis/.gitignore with default content (used by init command)
+pub fn create_bendis_gitignore() -> Result<()> {
+    let gitignore_path = get_bendis_dir().join(".gitignore");
+    fs::write(&gitignore_path, DEFAULT_GITIGNORE_CONTENT)
+        .context("Failed to create .bendis/.gitignore")?;
+    Ok(())
 }

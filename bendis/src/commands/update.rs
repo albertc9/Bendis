@@ -1,4 +1,5 @@
 use anyhow::{bail, Context, Result};
+use colored::Colorize;
 use sha2::{Sha256, Digest};
 use std::fs;
 use std::path::Path;
@@ -21,6 +22,14 @@ pub fn run() -> Result<()> {
         bail!(
             "error: .bendis directory not found\nrun `bendis init` first to initialize the project"
         );
+    }
+
+    // Check .bendis/.gitignore if enabled in config
+    let mut gitignore_warning = None;
+    if cfg.gitignore_check == 1 {
+        if let Err(e) = config::check_bendis_gitignore() {
+            gitignore_warning = Some(e.to_string());
+        }
     }
 
     // Step 1: Run bender update in .bendis directory
@@ -51,6 +60,16 @@ pub fn run() -> Result<()> {
     verify_completion(&root_dir)?;
 
     println!("Done");
+
+    // Display gitignore warning if there was an issue
+    if let Some(warning_msg) = gitignore_warning {
+        eprintln!("\n{}", "warning:".yellow().bold());
+        eprintln!("  {}", warning_msg);
+        eprintln!("  Some files in .bendis/ may be tracked by git unexpectedly.");
+        eprintln!("  Please review .bendis/.gitignore and ensure it contains the required entries.");
+        eprintln!("  To disable this check, set 'gitignore_check = 0' in: {}",
+                  "bendis config".cyan());
+    }
 
     Ok(())
 }
