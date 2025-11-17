@@ -1,24 +1,19 @@
 use anyhow::{Context, Result};
-use std::path::PathBuf;
 use std::process::Command;
 
-use crate::utils::config::BendisConfig;
-
-const CONFIG_FILE_NAME: &str = ".bendis.toml";
-
-fn get_root_dir() -> PathBuf {
-    PathBuf::from(".")
-}
+use crate::utils::config::{BendisConfig, get_config_path};
 
 pub fn run() -> Result<()> {
-    let config_path = get_root_dir().join(CONFIG_FILE_NAME);
+    let config_path = get_config_path()?;
 
     // Ensure config file exists
     if !config_path.exists() {
-        println!("Configuration file not found, creating default...");
+        println!("Global configuration file not found, creating default...");
         let default_config = BendisConfig::default();
         default_config.save()?;
-        println!("Created {}", config_path.display());
+        println!("Created global config at: {}", config_path.display());
+    } else {
+        println!("Opening global config at: {}", config_path.display());
     }
 
     // Detect available editor
@@ -26,7 +21,7 @@ pub fn run() -> Result<()> {
         .or_else(|_| std::env::var("VISUAL"))
         .unwrap_or_else(|_| "nano".to_string());
 
-    println!("Opening {} with {}...", CONFIG_FILE_NAME, editor);
+    println!("Using editor: {}", editor);
 
     // Open editor
     let status = Command::new(&editor)

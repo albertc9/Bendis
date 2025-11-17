@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-const CONFIG_FILE_NAME: &str = ".bendis.toml";
+const CONFIG_FILE_NAME: &str = "config.toml";
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BendisConfig {
@@ -36,16 +36,16 @@ impl Default for BendisConfig {
 }
 
 impl BendisConfig {
-    /// Load configuration from .bendis.toml file
+    /// Load configuration from global config file
     /// If file doesn't exist, create it with default values
     pub fn load() -> Result<Self> {
-        let config_path = get_root_dir().join(CONFIG_FILE_NAME);
+        let config_path = get_config_path()?;
 
         if config_path.exists() {
             let content = fs::read_to_string(&config_path)
-                .context("Failed to read .bendis.toml")?;
+                .context("Failed to read bendis config.toml")?;
             let config: BendisConfig = toml::from_str(&content)
-                .context("Failed to parse .bendis.toml")?;
+                .context("Failed to parse bendis config.toml")?;
             Ok(config)
         } else {
             // Create default config file
@@ -55,15 +55,22 @@ impl BendisConfig {
         }
     }
 
-    /// Save configuration to .bendis.toml file
+    /// Save configuration to global config file
     pub fn save(&self) -> Result<()> {
-        let config_path = get_root_dir().join(CONFIG_FILE_NAME);
+        let config_path = get_config_path()?;
+
+        // Ensure config directory exists
+        if let Some(parent) = config_path.parent() {
+            fs::create_dir_all(parent)
+                .context("Failed to create config directory")?;
+        }
 
         // Add comments to the generated TOML
         let content_with_comments = format!(
-"# Bendis Configuration File
+"# Bendis Global Configuration File
 #
 # This file controls the behavior of bendis (Bender Integration System)
+# Location: {}
 
 # Silent mode: suppress bender output during cache preparation
 # 1 = on (default), 0 = off
@@ -73,17 +80,27 @@ silent_mode = {}
 # 0 = off (default, keep cache), 1 = on (delete entire .bendis/.bender/)
 storage_saving_mode = {}
 ",
+            config_path.display(),
             self.silent_mode,
             self.storage_saving_mode
         );
 
         fs::write(&config_path, content_with_comments)
-            .context("Failed to write .bendis.toml")?;
+            .context("Failed to write bendis config.toml")?;
         Ok(())
     }
 }
 
-/// Get the .bendis directory path
+/// Get the global config file path
+/// Returns: ~/.config/bendis/config.toml on Linux/macOS
+///          %APPDATA%\bendis\config.toml on Windows
+pub fn get_config_path() -> Result<PathBuf> {
+    let config_dir = dirs::config_dir()
+        .context("Failed to get config directory")?;
+    Ok(config_dir.join("bendis").join(CONFIG_FILE_NAME))
+}
+
+/// Get the .bendis directory path in current project
 pub fn get_bendis_dir() -> PathBuf {
     PathBuf::from(".bendis")
 }

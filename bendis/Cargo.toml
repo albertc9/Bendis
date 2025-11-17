@@ -1,6 +1,6 @@
 [package]
 name = "bendis"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 authors = ["Heris Team"]
 description = "A patch tool for Bender to work better in HERIS project"
@@ -26,6 +26,7 @@ toml = "0.8"
 colored = "2.1"
 regex = "1.10"
 sha2 = "0.10"
+dirs = "5.0"
 
 [profile.release]
 opt-level = 3
