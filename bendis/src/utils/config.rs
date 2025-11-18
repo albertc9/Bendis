@@ -156,10 +156,6 @@ pub fn get_root_dir() -> PathBuf {
 /// Required entries for .bendis/.gitignore
 const REQUIRED_GITIGNORE_ENTRIES: &[&str] = &[
     ".bender/",
-    "hw/",
-    "sw/",
-    "target/",
-    "utils/",
 ];
 
 /// Default .gitignore content with header comment
@@ -168,10 +164,7 @@ const DEFAULT_GITIGNORE_CONTENT: &str = "# Auto-managed by bendis
 # You can add your own entries after this section
 
 .bender/
-hw/
-sw/
-target/
-utils/
+
 ";
 
 /// Check if .bendis/.gitignore contains all required entries
