@@ -40,6 +40,14 @@ pub fn run() -> Result<()> {
     println!("  Converting URLs...");
     format::convert(&bendis_dir, &root_dir)?;
 
+    // Step 2.5: Ensure root .gitignore has required entries
+    println!("  Updating .gitignore...");
+    config::ensure_root_gitignore_entries()?;
+
+    // Step 2.6: Copy hw/ and target/ directories from .bendis/ to root
+    println!("  Syncing hw/ and target/ directories...");
+    config::copy_bendis_dirs_to_root()?;
+
     // Step 3: Check if files changed, run bender update if needed
     println!("  Checking for changes...");
     let needs_update = check_files_changed(&root_dir)?;
