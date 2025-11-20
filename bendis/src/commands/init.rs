@@ -8,21 +8,21 @@ use crate::utils::config;
 pub fn run() -> Result<()> {
     println!("{}", "Initializing Bendis project...".bold().green());
 
-    let bendis_dir = Path::new(".bendis");
+    let bendis_dir = Path::new("bendis_workspace");
     let bender_yml = bendis_dir.join("Bender.yml");
     let dot_bender_yml = bendis_dir.join(".bender.yml");
 
-    // Check if .bendis/Bender.yml or .bendis/.bender.yml exist and have content
+    // Check if bendis_workspace/Bender.yml or bendis_workspace/.bender.yml exist and have content
     if bender_yml.exists() {
         let content = fs::read_to_string(&bender_yml)
-            .context("Failed to read .bendis/Bender.yml")?;
+            .context("Failed to read bendis_workspace/Bender.yml")?;
         if !content.trim().is_empty() {
             bail!(
                 "{}\n{}",
                 "Initialization failed!".red().bold(),
                 format!(
                     "{} already exists with content. Please backup or delete it first.",
-                    ".bendis/Bender.yml".yellow()
+                    "bendis_workspace/Bender.yml".yellow()
                 )
             );
         }
@@ -30,50 +30,50 @@ pub fn run() -> Result<()> {
 
     if dot_bender_yml.exists() {
         let content = fs::read_to_string(&dot_bender_yml)
-            .context("Failed to read .bendis/.bender.yml")?;
+            .context("Failed to read bendis_workspace/.bender.yml")?;
         if !content.trim().is_empty() {
             bail!(
                 "{}\n{}",
                 "Initialization failed!".red().bold(),
                 format!(
                     "{} already exists with content. Please backup or delete it first.",
-                    ".bendis/.bender.yml".yellow()
+                    "bendis_workspace/.bender.yml".yellow()
                 )
             );
         }
     }
 
-    // Create .bendis directory if it doesn't exist
+    // Create bendis_workspace directory if it doesn't exist
     if !bendis_dir.exists() {
         fs::create_dir(bendis_dir)
-            .context("Failed to create .bendis directory")?;
-        println!("  {} Created .bendis/ directory", "✓".green());
+            .context("Failed to create bendis_workspace directory")?;
+        println!("  {} Created bendis_workspace/ directory", "✓".green());
     } else {
-        println!("  {} .bendis/ directory already exists", "ℹ".blue());
+        println!("  {} bendis_workspace/ directory already exists", "ℹ".blue());
     }
 
     // Create blank Bender.yml if it doesn't exist or is empty
     if !bender_yml.exists() || fs::read_to_string(&bender_yml)?.trim().is_empty() {
         fs::write(&bender_yml, "")
-            .context("Failed to create .bendis/Bender.yml")?;
-        println!("  {} Created blank .bendis/Bender.yml", "✓".green());
+            .context("Failed to create bendis_workspace/Bender.yml")?;
+        println!("  {} Created blank bendis_workspace/Bender.yml", "✓".green());
     }
 
     // Create blank .bender.yml if it doesn't exist or is empty
     if !dot_bender_yml.exists() || fs::read_to_string(&dot_bender_yml)?.trim().is_empty() {
         fs::write(&dot_bender_yml, "")
-            .context("Failed to create .bendis/.bender.yml")?;
-        println!("  {} Created blank .bendis/.bender.yml", "✓".green());
+            .context("Failed to create bendis_workspace/.bender.yml")?;
+        println!("  {} Created blank bendis_workspace/.bender.yml", "✓".green());
     }
 
-    // Create .gitignore in .bendis directory
+    // Create .gitignore in bendis_workspace directory
     config::create_bendis_gitignore()?;
-    println!("  {} Created .bendis/.gitignore", "✓".green());
+    println!("  {} Created bendis_workspace/.gitignore", "✓".green());
 
     println!("\n{}", "Bendis initialized successfully!".bold().green());
     println!(
         "\nNext steps:\n  1. Edit {} with your dependencies\n  2. Run {} to update",
-        ".bendis/Bender.yml".yellow(),
+        "bendis_workspace/Bender.yml".yellow(),
         "bendis update".cyan().bold()
     );
 

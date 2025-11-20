@@ -12,12 +12,12 @@ pub struct BendisConfig {
     #[serde(default = "default_silent_mode")]
     pub silent_mode: u8,
 
-    /// Storage saving mode: clean up .bendis/.bender/ after update
-    /// 0 = off (default, keep cache), 1 = on (delete entire .bendis/.bender/)
+    /// Storage saving mode: clean up bendis_workspace/.bender/ after update
+    /// 0 = off (default, keep cache), 1 = on (delete entire bendis_workspace/.bender/)
     #[serde(default = "default_storage_saving_mode")]
     pub storage_saving_mode: u8,
 
-    /// GitIgnore check: auto-manage .bendis/.gitignore file
+    /// GitIgnore check: auto-manage bendis_workspace/.gitignore file
     /// 1 = on (default), 0 = off
     #[serde(default = "default_gitignore_check")]
     pub gitignore_check: u8,
@@ -105,11 +105,11 @@ impl BendisConfig {
 # 1 = on (default), 0 = off
 silent_mode = {}
 
-# Storage saving mode: clean up .bendis/.bender/ after update
-# 0 = off (default, keep cache), 1 = on (delete entire .bendis/.bender/)
+# Storage saving mode: clean up bendis_workspace/.bender/ after update
+# 0 = off (default, keep cache), 1 = on (delete entire bendis_workspace/.bender/)
 storage_saving_mode = {}
 
-# GitIgnore check: auto-manage .bendis/.gitignore file
+# GitIgnore check: auto-manage bendis_workspace/.gitignore file
 # 1 = on (default), 0 = off
 gitignore_check = {}
 
@@ -143,9 +143,9 @@ pub fn get_config_path() -> Result<PathBuf> {
     Ok(config_dir.join("bendis").join(CONFIG_FILE_NAME))
 }
 
-/// Get the .bendis directory path in current project
+/// Get the bendis_workspace directory path in current project
 pub fn get_bendis_dir() -> PathBuf {
-    PathBuf::from(".bendis")
+    PathBuf::from("bendis_workspace")
 }
 
 /// Get the project root directory path
@@ -153,7 +153,7 @@ pub fn get_root_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
-/// Required entries for .bendis/.gitignore
+/// Required entries for bendis_workspace/.gitignore
 const REQUIRED_GITIGNORE_ENTRIES: &[&str] = &[
     ".bender/",
 ];
@@ -167,7 +167,7 @@ const DEFAULT_GITIGNORE_CONTENT: &str = "# Auto-managed by bendis
 
 ";
 
-/// Check if .bendis/.gitignore contains all required entries
+/// Check if bendis_workspace/.gitignore contains all required entries
 /// Returns Ok(()) if all required entries exist, or Err with missing entries
 pub fn check_bendis_gitignore() -> Result<()> {
     let gitignore_path = get_bendis_dir().join(".gitignore");
@@ -175,13 +175,13 @@ pub fn check_bendis_gitignore() -> Result<()> {
     // If .gitignore doesn't exist, create it with default content
     if !gitignore_path.exists() {
         fs::write(&gitignore_path, DEFAULT_GITIGNORE_CONTENT)
-            .context("Failed to create .bendis/.gitignore")?;
+            .context("Failed to create bendis_workspace/.gitignore")?;
         return Ok(());
     }
 
     // Read existing content
     let existing_content = fs::read_to_string(&gitignore_path)
-        .context("Failed to read .bendis/.gitignore")?;
+        .context("Failed to read bendis_workspace/.gitignore")?;
 
     // Check if all required entries are present
     let missing_entries: Vec<&str> = REQUIRED_GITIGNORE_ENTRIES
@@ -192,7 +192,7 @@ pub fn check_bendis_gitignore() -> Result<()> {
 
     if !missing_entries.is_empty() {
         anyhow::bail!(
-            "Missing required entries in .bendis/.gitignore: {}",
+            "Missing required entries in bendis_workspace/.gitignore: {}",
             missing_entries.join(", ")
         );
     }
@@ -200,11 +200,11 @@ pub fn check_bendis_gitignore() -> Result<()> {
     Ok(())
 }
 
-/// Create .bendis/.gitignore with default content (used by init command)
+/// Create bendis_workspace/.gitignore with default content (used by init command)
 pub fn create_bendis_gitignore() -> Result<()> {
     let gitignore_path = get_bendis_dir().join(".gitignore");
     fs::write(&gitignore_path, DEFAULT_GITIGNORE_CONTENT)
-        .context("Failed to create .bendis/.gitignore")?;
+        .context("Failed to create bendis_workspace/.gitignore")?;
     Ok(())
 }
 
@@ -263,7 +263,7 @@ pub fn ensure_root_gitignore_entries() -> Result<()> {
     Ok(())
 }
 
-/// Copy directories from .bendis/ to root directory
+/// Copy directories from bendis_workspace/ to root directory
 /// Copies hw/ and target/ directories, overwriting if they exist
 /// Uses hash comparison to skip copying if content hasn't changed
 pub fn copy_bendis_dirs_to_root() -> Result<()> {
@@ -301,7 +301,7 @@ pub fn copy_bendis_dirs_to_root() -> Result<()> {
 
                 // Copy directory recursively
                 copy_dir_recursive(&src_dir, &dest_dir)
-                    .with_context(|| format!("Failed to copy .bendis/{}/ to root", dir_name))?;
+                    .with_context(|| format!("Failed to copy bendis_workspace/{}/ to root", dir_name))?;
             }
         }
     }

@@ -17,14 +17,14 @@ pub fn run() -> Result<()> {
     let bendis_dir = config::get_bendis_dir();
     let root_dir = config::get_root_dir();
 
-    // Check if .bendis directory exists
+    // Check if bendis_workspace directory exists
     if !bendis_dir.exists() {
         bail!(
-            "error: .bendis directory not found\nrun `bendis init` first to initialize the project"
+            "error: bendis_workspace directory not found\nrun `bendis init` first to initialize the project"
         );
     }
 
-    // Check .bendis/.gitignore if enabled in config
+    // Check bendis_workspace/.gitignore if enabled in config
     let mut gitignore_warning = None;
     if cfg.gitignore_check == 1 {
         if let Err(e) = config::check_bendis_gitignore() {
@@ -32,7 +32,7 @@ pub fn run() -> Result<()> {
         }
     }
 
-    // Step 1: Run bender update in .bendis directory
+    // Step 1: Run bender update in bendis_workspace directory
     println!("  Preparing cache files...");
     run_bender_update_in_bendis(&bendis_dir, cfg.silent_mode == 1)?;
 
@@ -44,7 +44,7 @@ pub fn run() -> Result<()> {
     println!("  Updating .gitignore...");
     config::ensure_root_gitignore_entries()?;
 
-    // Step 2.6: Copy hw/ and target/ directories from .bendis/ to root
+    // Step 2.6: Copy hw/ and target/ directories from bendis_workspace/ to root
     println!("  Syncing hw/ and target/ directories...");
     config::copy_bendis_dirs_to_root()?;
 
@@ -62,7 +62,7 @@ pub fn run() -> Result<()> {
 
     // Step 4: Clean up based on storage_saving_mode
     println!("  Cleaning up cache...");
-    cleanup_bendis_bender_dir(&bendis_dir, cfg.storage_saving_mode == 1)?;
+    cleanup_bendis_workspace_bender_dir(&bendis_dir, cfg.storage_saving_mode == 1)?;
 
     // Step 5: Verify
     verify_completion(&root_dir)?;
@@ -73,8 +73,8 @@ pub fn run() -> Result<()> {
     if let Some(warning_msg) = gitignore_warning {
         eprintln!("\n{}", "warning:".yellow().bold());
         eprintln!("  {}", warning_msg);
-        eprintln!("  Some files in .bendis/ may be tracked by git unexpectedly.");
-        eprintln!("  Please review .bendis/.gitignore and ensure it contains the required entries.");
+        eprintln!("  Some files in bendis_workspace/ may be tracked by git unexpectedly.");
+        eprintln!("  Please review bendis_workspace/.gitignore and ensure it contains the required entries.");
         eprintln!("  To disable this check, set 'gitignore_check = 0' in: {}",
                   "bendis config".cyan());
     }
@@ -105,7 +105,7 @@ fn check_files_changed(root_dir: &Path) -> Result<bool> {
     let current_bender_yml_hash = calculate_file_hash(&bender_yml)?;
     let current_dot_bender_yml_hash = calculate_file_hash(&dot_bender_yml)?;
 
-    // Calculate new hashes from .bendis
+    // Calculate new hashes from bendis_workspace
     let bendis_dir = config::get_bendis_dir();
     let new_bender_yml = bendis_dir.join("Bender.yml");
     let new_dot_bender_yml = root_dir.join(".bender.yml"); // This was just written by format::convert
@@ -125,7 +125,7 @@ fn check_files_changed(root_dir: &Path) -> Result<bool> {
 
 fn run_bender_update_in_bendis(bendis_dir: &Path, silent: bool) -> Result<()> {
     let mut cmd = Command::new("bender");
-    cmd.args(&["-d", "./.bendis", "update"]);
+    cmd.args(&["-d", "./bendis_workspace", "update"]);
 
     // If silent mode is enabled, suppress both stdout and stderr
     if silent {
@@ -137,13 +137,13 @@ fn run_bender_update_in_bendis(bendis_dir: &Path, silent: bool) -> Result<()> {
         .context("Failed to run bender. Is bender installed and in PATH?")?;
 
     if !status.success() {
-        bail!("error: bender update in .bendis/ failed");
+        bail!("error: bender update in bendis_workspace/ failed");
     }
 
     // Check if Bender.lock was created
     let lock_file = bendis_dir.join("Bender.lock");
     if !lock_file.exists() {
-        bail!("error: failed to generate .bendis/Bender.lock");
+        bail!("error: failed to generate bendis_workspace/Bender.lock");
     }
 
     Ok(())
@@ -180,13 +180,13 @@ fn run_bender_update_in_root() -> Result<()> {
     Ok(())
 }
 
-fn cleanup_bendis_bender_dir(bendis_dir: &Path, full_cleanup: bool) -> Result<()> {
+fn cleanup_bendis_workspace_bender_dir(bendis_dir: &Path, full_cleanup: bool) -> Result<()> {
     if full_cleanup {
-        // storage_saving_mode = 1: delete entire .bendis/.bender/
+        // storage_saving_mode = 1: delete entire bendis_workspace/.bender/
         let bender_dir = bendis_dir.join(".bender");
         if bender_dir.exists() {
             fs::remove_dir_all(&bender_dir)
-                .context("Failed to remove .bendis/.bender/")?;
+                .context("Failed to remove bendis_workspace/.bender/")?;
         }
     } else {
         // storage_saving_mode = 0: don't delete anything (keep cache)

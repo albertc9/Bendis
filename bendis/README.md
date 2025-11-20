@@ -46,11 +46,11 @@ cargo install bendis
 bendis init
 ```
 
-Creates a `.bendis/` directory with blank `Bender.yml` and `.bender.yml`.
+Creates a `bendis_workspace/` directory with blank `Bender.yml` and `.bender.yml`.
 
 #### Update dependencies
 
-When using Bendis, **only edit the configuration files inside `.bendis/`**.
+When using Bendis, **only edit the configuration files inside `bendis_workspace/`**.
 The copies in the project root will be overwritten.
 
 Update dependencies with:
@@ -72,7 +72,7 @@ All other commands are passed through to Bender transparently.
 
 ```
 pulpissimo/
-├── .bendis/                # Bendis working directory
+├── bendis_workspace/       # Bendis working directory
 │   ├── .bender/            # (-)Bender cache folder (optional on Bendis config)
 │   ├── Bender.yml          # (***)The config you need to edit
 │   ├── .bender.yml         # (***)The overrides config you may need to edit
@@ -83,7 +83,7 @@ pulpissimo/
 ├── .bender.yml             # (-)Converted overrides (IHEP URLs)
 ├── Bender.lock             # (-)Final lock file generated automatically
 ├── .bender/                # (-)Dependencies directory generated automatically
-├── hw/                     # (-)Some dependencies automaticaly updated from `.bendis/`
-├── target/                 # (-)Some dependencies automaticaly updated from `.bendis/`
+├── hw/                     # (-)Some dependencies automaticaly updated from `bendis_workspace/`
+├── target/                 # (-)Some dependencies automaticaly updated from `bendis_workspace/`
 └── ...
 ```

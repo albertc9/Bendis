@@ -14,4 +14,7 @@ bendis/target/
 # Test directories
 test_*/
 
+# Workspace directories (for testing)
+bendis_workspace/
+
 Mechanism.md

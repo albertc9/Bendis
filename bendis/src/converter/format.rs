@@ -332,17 +332,17 @@ pub fn convert(
     let bender_yml_path = bendis_dir.join(".bender.yml");
 
     let lock_content = fs::read_to_string(&lock_path)
-        .context("Failed to read .bendis/Bender.lock")?;
+        .context("Failed to read bendis_workspace/Bender.lock")?;
     let lock_data: LockFile = serde_yaml::from_str(&lock_content)
         .context("Failed to parse Bender.lock")?;
 
     let yml_content = fs::read_to_string(&yml_path)
-        .context("Failed to read .bendis/Bender.yml")?;
+        .context("Failed to read bendis_workspace/Bender.yml")?;
     let yml_data: BenderYml = serde_yaml::from_str(&yml_content)
         .unwrap_or(BenderYml { dependencies: None });
 
     let bender_yml_text = fs::read_to_string(&bender_yml_path)
-        .context("Failed to read .bendis/.bender.yml")?;
+        .context("Failed to read bendis_workspace/.bender.yml")?;
     let bender_yml_data: DotBenderYml = serde_yaml::from_str(&bender_yml_text)
         .unwrap_or(DotBenderYml { overrides: None });
 
