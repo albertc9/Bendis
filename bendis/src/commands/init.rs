@@ -6,6 +6,14 @@ use std::path::Path;
 use crate::utils::config;
 
 pub fn run() -> Result<()> {
+    // Check for legacy structure and offer migration
+    if config::check_and_migrate_if_needed()? {
+        // Migration was performed or user declined
+        // If migration was successful, we're done
+        // If user declined, they can still initialize manually later
+        return Ok(());
+    }
+
     println!("{}", "Initializing Bendis project...".bold().green());
 
     let bendis_dir = Path::new("bendis_workspace");

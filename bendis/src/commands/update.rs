@@ -9,6 +9,19 @@ use crate::converter::format;
 use crate::utils::config::{self, BendisConfig};
 
 pub fn run() -> Result<()> {
+    // Check for legacy structure and offer migration
+    if config::check_and_migrate_if_needed()? {
+        // Migration was performed or user declined
+        // If migration was successful, continue with update
+        // If user declined, exit
+        if !config::get_bendis_dir().exists() {
+            // User declined migration and no new structure exists
+            bail!(
+                "error: bendis_workspace directory not found\nrun `bendis init` to migrate or initialize the project"
+            );
+        }
+    }
+
     println!("Updating dependencies...");
 
     // Load configuration

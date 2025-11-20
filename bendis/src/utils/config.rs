@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 const CONFIG_FILE_NAME: &str = "config.toml";
@@ -396,4 +397,116 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Check if legacy .bendis directory exists with complete structure
+pub fn detect_legacy_structure() -> bool {
+    let legacy_dir = Path::new(".bendis");
+
+    if !legacy_dir.exists() || !legacy_dir.is_dir() {
+        return false;
+    }
+
+    // Check if all required files exist
+    let bender_yml = legacy_dir.join("Bender.yml");
+    let dot_bender_yml = legacy_dir.join(".bender.yml");
+    let bender_lock = legacy_dir.join("Bender.lock");
+
+    bender_yml.exists() && dot_bender_yml.exists() && bender_lock.exists()
+}
+
+/// Prompt user for migration confirmation
+pub fn prompt_migration() -> Result<bool> {
+    use colored::Colorize;
+
+    println!("\n{}", "━".repeat(60).yellow());
+    println!("{}", "  Detected legacy Bendis structure".bold().yellow());
+    println!("{}", "━".repeat(60).yellow());
+    println!();
+    println!("Bendis {} uses a new workspace directory name:", "≥v0.3.0".cyan());
+    println!("  {} → {}", ".bendis/".red().strikethrough(), "bendis_workspace/".green().bold());
+    println!();
+    println!("Would you like to upgrade your project structure?");
+    println!();
+    println!("{}", "Migration details:".bold());
+    println!("  {} Your existing .bendis/ will be renamed to bendis_workspace/", "•".cyan());
+    println!("  {} All files and settings will be preserved", "•".cyan());
+    println!("  {} This is a one-time migration", "•".cyan());
+    println!();
+    print!("Migrate to new structure? [{}]: ", "Y/n".bold());
+    io::stdout().flush()?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let input = input.trim().to_lowercase();
+
+    Ok(input.is_empty() || input == "y" || input == "yes")
+}
+
+/// Migrate legacy .bendis directory to bendis_workspace
+pub fn migrate_legacy_to_workspace() -> Result<()> {
+    use colored::Colorize;
+
+    let legacy_dir = Path::new(".bendis");
+    let new_dir = get_bendis_dir();
+
+    println!();
+    println!("{}", "Starting migration...".bold());
+
+    // Safety check: ensure new directory doesn't exist
+    if new_dir.exists() {
+        anyhow::bail!(
+            "Migration failed: {} already exists. Please remove it first or backup your data.",
+            new_dir.display()
+        );
+    }
+
+    // Step 1: Copy entire directory
+    println!("  {} Copying .bendis/ to bendis_workspace/...", "→".blue());
+    copy_dir_recursive(&legacy_dir, &new_dir)
+        .context("Failed to copy legacy directory")?;
+
+    // Step 2: Verify the copy
+    println!("  {} Verifying migration...", "→".blue());
+    let verify_files = ["Bender.yml", ".bender.yml", "Bender.lock"];
+    for file in &verify_files {
+        let new_file = new_dir.join(file);
+        if !new_file.exists() {
+            anyhow::bail!("Migration verification failed: {} not found", file);
+        }
+    }
+
+    // Step 3: Remove old directory
+    println!("  {} Removing old .bendis/...", "→".blue());
+    fs::remove_dir_all(&legacy_dir)
+        .context("Failed to remove legacy .bendis directory")?;
+
+    println!("  {} Migration completed successfully!", "✓".green());
+    println!();
+    println!("{}", "Your project has been upgraded to the new structure.".green());
+    println!("You can now use {} as usual.", "bendis update".cyan().bold());
+    println!();
+
+    Ok(())
+}
+
+/// Check and handle legacy migration at startup
+/// Returns true if migration was performed or declined
+pub fn check_and_migrate_if_needed() -> Result<bool> {
+    if !detect_legacy_structure() {
+        return Ok(false);
+    }
+
+    // Legacy structure detected, prompt user
+    if prompt_migration()? {
+        migrate_legacy_to_workspace()?;
+        Ok(true)
+    } else {
+        use colored::Colorize;
+        println!();
+        println!("{}", "Migration skipped.".yellow());
+        println!("Note: You can migrate later by running {} again.", "bendis init".cyan());
+        println!();
+        Ok(true)
+    }
 }
