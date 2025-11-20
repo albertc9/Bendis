@@ -186,6 +186,21 @@ fn run_bender_update_in_bendis(bendis_dir: &Path, silent: bool) -> Result<()> {
         for log_line in &log_buffer {
             eprint!("{}", log_line);
         }
+
+        // Check for specific fetch/version error pattern
+        let has_fetch_error = log_buffer.iter().any(|line| {
+            line.contains("Fetching Dependency") &&
+            line.contains("cannot satisfy requirement") &&
+            line.contains("may need fetch")
+        });
+
+        if has_fetch_error {
+            eprintln!("\n{}", "Possible solution:".yellow());
+            eprintln!("  1. Delete {} directory", "bendis_workspace/.bender/".cyan());
+            eprintln!("  2. Check your internet connection");
+            eprintln!("  3. Run {} again", "bendis update".cyan());
+        }
+
         bail!("error: bender update in bendis_workspace/ failed");
     }
 
@@ -261,6 +276,21 @@ fn run_bender_update_in_root() -> Result<()> {
         for log_line in &log_buffer {
             eprint!("{}", log_line);
         }
+
+        // Check for specific fetch/version error pattern
+        let has_fetch_error = log_buffer.iter().any(|line| {
+            line.contains("Fetching Dependency") &&
+            line.contains("cannot satisfy requirement") &&
+            line.contains("may need fetch")
+        });
+
+        if has_fetch_error {
+            eprintln!("\n{}", "Possible solution:".yellow());
+            eprintln!("  1. Delete {} directory", ".bender/".cyan());
+            eprintln!("  2. Check your internet connection");
+            eprintln!("  3. Run {} again", "bendis update".cyan());
+        }
+
         bail!("error: bender update in root directory failed");
     }
 
