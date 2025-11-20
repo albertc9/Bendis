@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use colored::Colorize;
 use sha2::{Sha256, Digest};
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -140,16 +141,51 @@ fn run_bender_update_in_bendis(bendis_dir: &Path, silent: bool) -> Result<()> {
     let mut cmd = Command::new("bender");
     cmd.args(&["-d", "./bendis_workspace", "update"]);
 
-    // If silent mode is enabled, suppress both stdout and stderr
-    if silent {
-        cmd.stdout(Stdio::null());  // Hide normal output
-        cmd.stderr(Stdio::null());  // Hide progress messages and warnings
-    }
+    // Always capture output for error logging
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
 
-    let status = cmd.status()
+    let mut child = cmd.spawn()
         .context("Failed to run bender. Is bender installed and in PATH?")?;
 
+    // Capture stdout and stderr
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+
+    let mut stdout_reader = BufReader::new(stdout);
+    let mut stderr_reader = BufReader::new(stderr);
+
+    let mut log_buffer = Vec::new();
+    let mut line = String::new();
+
+    // Read stdout
+    while stdout_reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if !silent {
+            print!("{}", line);
+        }
+        log_buffer.push(line.clone());
+        line.clear();
+    }
+
+    // Read stderr
+    while stderr_reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if !silent {
+            eprint!("{}", line);
+        }
+        log_buffer.push(line.clone());
+        line.clear();
+    }
+
+    let status = child.wait()
+        .context("Failed to wait for bender process")?;
+
     if !status.success() {
+        // Always display full log on error, regardless of silent mode
+        eprintln!("\n{}", "Error: bender update failed in bendis_workspace/".red());
+        eprintln!("\nCommand output:");
+        for log_line in &log_buffer {
+            eprint!("{}", log_line);
+        }
         bail!("error: bender update in bendis_workspace/ failed");
     }
 
@@ -181,12 +217,50 @@ fn cleanup_root_files(root_dir: &Path) -> Result<()> {
 }
 
 fn run_bender_update_in_root() -> Result<()> {
-    let status = Command::new("bender")
-        .arg("update")
-        .status()
+    let mut cmd = Command::new("bender");
+    cmd.arg("update");
+
+    // Always capture output for error logging
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let mut child = cmd.spawn()
         .context("Failed to run bender in root directory")?;
 
+    // Capture stdout and stderr
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+
+    let mut stdout_reader = BufReader::new(stdout);
+    let mut stderr_reader = BufReader::new(stderr);
+
+    let mut log_buffer = Vec::new();
+    let mut line = String::new();
+
+    // Read stdout (always visible for root bender update)
+    while stdout_reader.read_line(&mut line).unwrap_or(0) > 0 {
+        print!("{}", line);
+        log_buffer.push(line.clone());
+        line.clear();
+    }
+
+    // Read stderr (always visible for root bender update)
+    while stderr_reader.read_line(&mut line).unwrap_or(0) > 0 {
+        eprint!("{}", line);
+        log_buffer.push(line.clone());
+        line.clear();
+    }
+
+    let status = child.wait()
+        .context("Failed to wait for bender process")?;
+
     if !status.success() {
+        // Display simple error message with full log
+        eprintln!("\n{}", "Error: bender update failed in root directory".red());
+        eprintln!("\nCommand output:");
+        for log_line in &log_buffer {
+            eprint!("{}", log_line);
+        }
         bail!("error: bender update in root directory failed");
     }
 
