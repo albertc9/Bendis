@@ -209,32 +209,32 @@ pub fn create_bendis_gitignore() -> Result<()> {
     Ok(())
 }
 
-/// Required entries for root .gitignore
-const ROOT_GITIGNORE_ENTRIES: &[&str] = &[
+/// Required entries for bendis_workspace .gitignore
+const BENDIS_WORKSPACE_GITIGNORE_ENTRIES: &[&str] = &[
     "hw/",
     "target/",
 ];
 
-/// Header comment for root .gitignore managed section
-const ROOT_GITIGNORE_HEADER: &str = "\n# Auto-managed by bendis
+/// Header comment for bendis_workspace .gitignore managed section
+const BENDIS_WORKSPACE_GITIGNORE_HEADER: &str = "\n# Auto-managed by bendis
 # WARNING: Do not remove the entries below, they are required for proper git tracking
 # You can add your own entries after this section\n";
 
-/// Check and update root .gitignore to ensure it contains hw/ and target/
+/// Check and update bendis_workspace .gitignore to ensure it contains hw/ and target/
 /// Returns Ok(()) if entries are present or successfully added
-pub fn ensure_root_gitignore_entries() -> Result<()> {
-    let gitignore_path = get_root_dir().join(".gitignore");
+pub fn ensure_bendis_workspace_gitignore_entries() -> Result<()> {
+    let gitignore_path = get_bendis_dir().join(".gitignore");
 
     // Read existing content or create empty if doesn't exist
     let existing_content = if gitignore_path.exists() {
         fs::read_to_string(&gitignore_path)
-            .context("Failed to read .gitignore")?
+            .context("Failed to read bendis_workspace/.gitignore")?
     } else {
         String::new()
     };
 
     // Check which entries are missing
-    let missing_entries: Vec<&str> = ROOT_GITIGNORE_ENTRIES
+    let missing_entries: Vec<&str> = BENDIS_WORKSPACE_GITIGNORE_ENTRIES
         .iter()
         .filter(|&&entry| !existing_content.lines().any(|line| line.trim() == entry))
         .copied()
@@ -249,7 +249,7 @@ pub fn ensure_root_gitignore_entries() -> Result<()> {
     let mut new_content = existing_content;
 
     // Add header comment if we're adding entries
-    new_content.push_str(ROOT_GITIGNORE_HEADER);
+    new_content.push_str(BENDIS_WORKSPACE_GITIGNORE_HEADER);
 
     // Add missing entries
     for entry in missing_entries {
@@ -259,24 +259,56 @@ pub fn ensure_root_gitignore_entries() -> Result<()> {
 
     // Write back to file
     fs::write(&gitignore_path, new_content)
-        .context("Failed to update .gitignore")?;
+        .context("Failed to update bendis_workspace/.gitignore")?;
 
     Ok(())
 }
 
-/// Copy directories from bendis_workspace/ to root directory
+/// Remove hw/ and target/ entries from root .gitignore if they exist
+/// This ensures the root hw/ and target/ directories are tracked by git
+pub fn ensure_root_gitignore_excludes_hw_target() -> Result<()> {
+    let gitignore_path = get_root_dir().join(".gitignore");
+
+    // If .gitignore doesn't exist, nothing to do
+    if !gitignore_path.exists() {
+        return Ok(());
+    }
+
+    let existing_content = fs::read_to_string(&gitignore_path)
+        .context("Failed to read root .gitignore")?;
+
+    // Filter out hw/ and target/ entries
+    let new_content: String = existing_content
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            trimmed != "hw/" && trimmed != "target/"
+        })
+        .collect::<Vec<&str>>()
+        .join("\n");
+
+    // Only write if content changed
+    if new_content != existing_content.trim_end() {
+        fs::write(&gitignore_path, new_content + "\n")
+            .context("Failed to update root .gitignore")?;
+    }
+
+    Ok(())
+}
+
+/// Copy directories from root directory to bendis_workspace/
 /// Copies hw/ and target/ directories, overwriting if they exist
 /// Uses hash comparison to skip copying if content hasn't changed
-pub fn copy_bendis_dirs_to_root() -> Result<()> {
-    let bendis_dir = get_bendis_dir();
+pub fn copy_root_dirs_to_bendis_workspace() -> Result<()> {
     let root_dir = get_root_dir();
+    let bendis_dir = get_bendis_dir();
 
     // Directories to copy
     let dirs_to_copy = ["hw", "target"];
 
     for dir_name in &dirs_to_copy {
-        let src_dir = bendis_dir.join(dir_name);
-        let dest_dir = root_dir.join(dir_name);
+        let src_dir = root_dir.join(dir_name);
+        let dest_dir = bendis_dir.join(dir_name);
 
         // Only copy if source exists
         if src_dir.exists() {
@@ -297,12 +329,12 @@ pub fn copy_bendis_dirs_to_root() -> Result<()> {
                 // Remove destination if it exists
                 if dest_dir.exists() {
                     fs::remove_dir_all(&dest_dir)
-                        .with_context(|| format!("Failed to remove existing {}/", dir_name))?;
+                        .with_context(|| format!("Failed to remove existing bendis_workspace/{}/", dir_name))?;
                 }
 
                 // Copy directory recursively
                 copy_dir_recursive(&src_dir, &dest_dir)
-                    .with_context(|| format!("Failed to copy bendis_workspace/{}/ to root", dir_name))?;
+                    .with_context(|| format!("Failed to copy root {}/ to bendis_workspace/", dir_name))?;
             }
         }
     }
