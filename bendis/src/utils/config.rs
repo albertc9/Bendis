@@ -209,21 +209,20 @@ pub fn create_bendis_gitignore() -> Result<()> {
     Ok(())
 }
 
-/// Required entries for bendis_workspace .gitignore
-const BENDIS_WORKSPACE_GITIGNORE_ENTRIES: &[&str] = &[
-    "hw/",
-    "target/",
-];
-
 /// Header comment for bendis_workspace .gitignore managed section
 const BENDIS_WORKSPACE_GITIGNORE_HEADER: &str = "\n# Auto-managed by bendis
 # WARNING: Do not remove the entries below, they are required for proper git tracking
 # You can add your own entries after this section\n";
 
-/// Check and update bendis_workspace .gitignore to ensure it contains hw/ and target/
+/// Check and update bendis_workspace .gitignore to ensure it contains detected directories
+/// Automatically detects directories from Bender YAML files
 /// Returns Ok(()) if entries are present or successfully added
 pub fn ensure_bendis_workspace_gitignore_entries() -> Result<()> {
     let gitignore_path = get_bendis_dir().join(".gitignore");
+
+    // Get directories from YAML files
+    let dirs_to_ignore = extract_path_dependencies()?;
+    let entries_to_add: Vec<String> = dirs_to_ignore.iter().map(|d| format!("{}/", d)).collect();
 
     // Read existing content or create empty if doesn't exist
     let existing_content = if gitignore_path.exists() {
@@ -234,10 +233,10 @@ pub fn ensure_bendis_workspace_gitignore_entries() -> Result<()> {
     };
 
     // Check which entries are missing
-    let missing_entries: Vec<&str> = BENDIS_WORKSPACE_GITIGNORE_ENTRIES
+    let missing_entries: Vec<&str> = entries_to_add
         .iter()
-        .filter(|&&entry| !existing_content.lines().any(|line| line.trim() == entry))
-        .copied()
+        .filter(|entry| !existing_content.lines().any(|line| line.trim() == entry.as_str()))
+        .map(|s| s.as_str())
         .collect();
 
     // If all entries exist, nothing to do
@@ -264,8 +263,9 @@ pub fn ensure_bendis_workspace_gitignore_entries() -> Result<()> {
     Ok(())
 }
 
-/// Remove hw/ and target/ entries from root .gitignore if they exist
-/// This ensures the root hw/ and target/ directories are tracked by git
+/// Remove detected directory entries from root .gitignore if they exist
+/// This ensures the root directories are tracked by git
+/// Automatically detects directories from Bender YAML files
 pub fn ensure_root_gitignore_excludes_hw_target() -> Result<()> {
     let gitignore_path = get_root_dir().join(".gitignore");
 
@@ -274,15 +274,19 @@ pub fn ensure_root_gitignore_excludes_hw_target() -> Result<()> {
         return Ok(());
     }
 
+    // Get directories from YAML files
+    let dirs_to_exclude = extract_path_dependencies()?;
+    let entries_to_remove: Vec<String> = dirs_to_exclude.iter().map(|d| format!("{}/", d)).collect();
+
     let existing_content = fs::read_to_string(&gitignore_path)
         .context("Failed to read root .gitignore")?;
 
-    // Filter out hw/ and target/ entries
+    // Filter out detected directory entries
     let new_content: String = existing_content
         .lines()
         .filter(|line| {
             let trimmed = line.trim();
-            trimmed != "hw/" && trimmed != "target/"
+            !entries_to_remove.iter().any(|entry| trimmed == entry)
         })
         .collect::<Vec<&str>>()
         .join("\n");
@@ -297,14 +301,14 @@ pub fn ensure_root_gitignore_excludes_hw_target() -> Result<()> {
 }
 
 /// Copy directories from root directory to bendis_workspace/
-/// Copies hw/ and target/ directories, overwriting if they exist
+/// Automatically detects directories from Bender YAML files
 /// Uses hash comparison to skip copying if content hasn't changed
 pub fn copy_root_dirs_to_bendis_workspace() -> Result<()> {
     let root_dir = get_root_dir();
     let bendis_dir = get_bendis_dir();
 
-    // Directories to copy
-    let dirs_to_copy = ["hw", "target"];
+    // Get directories to copy from YAML files (or default to hw, target)
+    let dirs_to_copy = extract_path_dependencies()?;
 
     for dir_name in &dirs_to_copy {
         let src_dir = root_dir.join(dir_name);
@@ -541,4 +545,74 @@ pub fn check_and_migrate_if_needed() -> Result<bool> {
         println!();
         Ok(true)
     }
+}
+
+/// Extract top-level directories from path dependencies in Bender YAML files
+/// Returns a Vec of unique top-level directory names (e.g., ["hw", "target", "hardware"])
+pub fn extract_path_dependencies() -> Result<Vec<String>> {
+    use serde_yaml::Value;
+    use std::collections::HashSet;
+
+    let bendis_dir = get_bendis_dir();
+    let bender_yml = bendis_dir.join("Bender.yml");
+    let dot_bender_yml = bendis_dir.join(".bender.yml");
+
+    let mut top_level_dirs = HashSet::new();
+
+    // Parse Bender.yml if it exists
+    if bender_yml.exists() {
+        let content = fs::read_to_string(&bender_yml)
+            .context("Failed to read Bender.yml")?;
+
+        if let Ok(yaml) = serde_yaml::from_str::<Value>(&content) {
+            // Extract paths from dependencies section
+            if let Some(deps) = yaml.get("dependencies").and_then(|v| v.as_mapping()) {
+                for (_, dep_value) in deps {
+                    if let Some(path) = dep_value.get("path").and_then(|p| p.as_str()) {
+                        if let Some(top_dir) = extract_top_level_dir(path) {
+                            top_level_dirs.insert(top_dir);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Parse .bender.yml if it exists
+    if dot_bender_yml.exists() {
+        let content = fs::read_to_string(&dot_bender_yml)
+            .context("Failed to read .bender.yml")?;
+
+        if let Ok(yaml) = serde_yaml::from_str::<Value>(&content) {
+            // Extract paths from overrides section
+            if let Some(overrides) = yaml.get("overrides").and_then(|v| v.as_mapping()) {
+                for (_, override_value) in overrides {
+                    if let Some(path) = override_value.get("path").and_then(|p| p.as_str()) {
+                        if let Some(top_dir) = extract_top_level_dir(path) {
+                            top_level_dirs.insert(top_dir);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // If no directories found, fallback to default
+    if top_level_dirs.is_empty() {
+        Ok(vec!["hw".to_string(), "target".to_string()])
+    } else {
+        let mut dirs: Vec<String> = top_level_dirs.into_iter().collect();
+        dirs.sort();
+        Ok(dirs)
+    }
+}
+
+/// Extract the top-level directory from a path string
+/// E.g., "hw/padframe/pulpissimo" -> Some("hw")
+///       "target/sim/vip" -> Some("target")
+fn extract_top_level_dir(path: &str) -> Option<String> {
+    path.split('/')
+        .next()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
 }

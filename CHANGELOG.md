@@ -8,9 +8,12 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 ### Added
+- Support different path for rtl code only for the target module. Not only in `hw/` or something others.
+- Add function `extract_path_dependencies()`
 
 ### Changed
 - Now the workspace for rtl code only for the target module is in root directory, not in `bendis_workspace`.
+- Changed function `copy_root_dirs_to_bendis_workspace()`, `ensure_bendis_workspace_gitignore_entries()`, and `ensure_root_gitignore_excludes_hw_target()`.
 
 ## 0.3.0 - 2025-11-19
 ### Fixed
