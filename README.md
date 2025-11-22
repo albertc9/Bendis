@@ -19,6 +19,7 @@ A patch tool for Bender to work better in the HERIS project.
 - **Crates.io:** https://crates.io/crates/bendis  
 - **GitHub:** https://github.com/albertc9/Bendis  
 - **GitLab (IHEP internal):** https://code.ihep.ac.cn/heris/bendis  
+- **Bendis For Users**: https://code.ihep.ac.cn/heris/gitlab-profile/-/wikis/Bendis-For-Users
 
 ---
 

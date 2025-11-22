@@ -46,23 +46,27 @@ pub fn run() -> Result<()> {
         }
     }
 
-    // Step 1: Run bender update in bendis_workspace directory
+    // Step 1: Copy hw/ and target/ directories from root to bendis_workspace/
+    println!("  Syncing hw/ and target/ directories to bendis_workspace/...");
+    config::copy_root_dirs_to_bendis_workspace()?;
+
+    // Step 2: Run bender update in bendis_workspace directory
     println!("  Preparing cache files...");
     run_bender_update_in_bendis(&bendis_dir, cfg.silent_mode == 1)?;
 
-    // Step 2: Run format converter
+    // Step 3: Run format converter
     println!("  Converting URLs...");
     format::convert(&bendis_dir, &root_dir)?;
 
-    // Step 2.5: Ensure root .gitignore has required entries
-    println!("  Updating .gitignore...");
-    config::ensure_root_gitignore_entries()?;
+    // Step 4: Ensure bendis_workspace/.gitignore has required entries (hw/, target/)
+    println!("  Updating bendis_workspace/.gitignore...");
+    config::ensure_bendis_workspace_gitignore_entries()?;
 
-    // Step 2.6: Copy hw/ and target/ directories from bendis_workspace/ to root
-    println!("  Syncing hw/ and target/ directories...");
-    config::copy_bendis_dirs_to_root()?;
+    // Step 5: Ensure root .gitignore does not contain hw/, target/
+    println!("  Updating root .gitignore...");
+    config::ensure_root_gitignore_excludes_hw_target()?;
 
-    // Step 3: Check if files changed, run bender update if needed
+    // Step 6: Check if files changed, run bender update if needed
     println!("  Checking for changes...");
     let needs_update = check_files_changed(&root_dir)?;
 
@@ -74,11 +78,11 @@ pub fn run() -> Result<()> {
         println!("  No changes detected, skipping bender update");
     }
 
-    // Step 4: Clean up based on storage_saving_mode
+    // Step 7: Clean up based on storage_saving_mode
     println!("  Cleaning up cache...");
     cleanup_bendis_workspace_bender_dir(&bendis_dir, cfg.storage_saving_mode == 1)?;
 
-    // Step 5: Verify
+    // Step 8: Verify
     verify_completion(&root_dir)?;
 
     println!("Done");
