@@ -13,6 +13,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Start ssh-agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.GITLAB_SSH_KEY }}
+
+      - name: Add GitLab host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan code.ihep.ac.cn >> ~/.ssh/known_hosts
+
       - name: Configure git
         run: |
           git config --global user.name "heris-sync-bot"
@@ -20,16 +30,15 @@ jobs:
 
       - name: Mirror from GitLab to GitHub
         env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 1. Clone mirror repo from GitLab
-          git clone --mirror "https://oauth2:${GITLAB_TOKEN}@code.ihep.ac.cn/heris/bendis.git" repo.git
+          # 1. 用 SSH 从 GitLab clone mirror
+          git clone --mirror "git@code.ihep.ac.cn:heris/bendis.git" repo.git
 
           cd repo.git
 
-          # 2. Add GitHub as push target
+          # 2. 加 GitHub 作为 push 目标
           git remote add github "https://x-access-token:${GITHUB_TOKEN}@github.com/albertc9/Bendis.git"
 
-          # 3. Push all refs (branches, tags) as a complete mirror to GitHub
+          # 3. 把所有 refs（branches/tags）完整镜像到 GitHub
           git push --mirror github
