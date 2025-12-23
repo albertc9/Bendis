@@ -3,9 +3,9 @@ name: Sync from GitLab
 on:
   schedule:
     # 08:00 UTC
-    - cron: '0 8 * * *'
+    # - cron: '0 8 * * *'
     # 16:00 UTC
-    - cron: '0 16 * * *'
+    # - cron: '0 16 * * *'
   workflow_dispatch:
 
 jobs:
